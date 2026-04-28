@@ -1,0 +1,22 @@
+slack:
+  webhook_url: "YOUR_SLACK_WEBHOOK_URL_HERE"
+
+thresholds:
+  zscore_limit: 3.0
+  rate_multiplier: 5.0
+  error_rate_multiplier: 3.0
+  sliding_window_seconds: 60
+  baseline_window_minutes: 30
+  baseline_recalc_interval_seconds: 60
+  min_baseline_samples: 30
+
+bans:
+  schedule_minutes: [10, 30, 120]
+
+dashboard:
+  port: 8080
+  refresh_seconds: 3
+
+logging:
+  audit_log_path: "/var/log/detector/audit.log"
+  nginx_log_path: "/var/log/nginx/hng-access.log"

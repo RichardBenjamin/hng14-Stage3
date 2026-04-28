@@ -1,0 +1,85 @@
+version: "3.8"
+
+services:
+
+  # ─── NGINX ────────────────────────────────────────────────
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    ports:
+      # Expose port 80 to the internet
+      # Format is host_port:container_port
+      - "80:80"
+    volumes:
+      # Mount our custom nginx config into the container
+      # This replaces the default nginx config
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+
+      # Mount the shared log volume so nginx can write logs here
+      - HNG-nginx-logs:/var/log/nginx
+    depends_on:
+      # Nginx needs Nextcloud to be running before it starts
+      # because it will immediately try to proxy to it
+      - nextcloud
+    networks:
+      - hng-network
+    restart: unless-stopped
+
+  # ─── NEXTCLOUD ────────────────────────────────────────────
+  nextcloud:
+    # This is the exact image specified in the task
+    # Do not change this
+    image: kefaslungu/hng-nextcloud
+    container_name: nextcloud
+    # No ports exposed here intentionally
+    # Nextcloud is only reachable through Nginx, not directly
+    volumes:
+      # Mount the shared log volume read-only
+      # Nextcloud can see the logs but cannot write to them
+      - HNG-nginx-logs:/var/log/nginx:ro
+    networks:
+      - hng-network
+    restart: unless-stopped
+
+  # ─── DETECTOR ─────────────────────────────────────────────
+  detector:
+    # Build from your local detector folder
+    build: ./detector
+    container_name: detector
+    ports:
+      # Expose the dashboard on port 8080
+      - "8080:8080"
+    volumes:
+      # Mount the shared log volume read-only
+      # Detector reads logs but never writes to them
+      - HNG-nginx-logs:/var/log/nginx:ro
+    cap_add:
+      # Give the detector permission to run iptables commands
+      # NET_ADMIN allows network administration at kernel level
+      - NET_ADMIN
+    network_mode: host
+    # network_mode host means the detector shares the host's
+    # network stack directly — this is required for iptables
+    # rules to affect traffic on the actual server, not just
+    # inside the Docker network
+    depends_on:
+      # Detector needs Nginx running first so there are
+      # logs to read
+      - nginx
+    restart: unless-stopped
+
+# ─── VOLUMES ────────────────────────────────────────────────
+volumes:
+  HNG-nginx-logs:
+    # This is a named volume managed by Docker
+    # Both nginx and detector mount this same volume
+    # The name matches exactly what the task requires
+    name: HNG-nginx-logs
+
+# ─── NETWORKS ───────────────────────────────────────────────
+networks:
+  hng-network:
+    # A private network just for these containers
+    # Containers on this network can reach each other
+    # by their service name e.g. http://nextcloud
+    driver: bridge
